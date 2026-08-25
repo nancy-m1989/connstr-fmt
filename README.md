@@ -23,6 +23,10 @@ exactly where and why.
 - To include the quote character itself inside a quoted value, double it:
   `Password="a""b"` is the value `a"b`.
 - Keys are case-insensitive and must be unique.
+- A few key aliases are recognized as the same setting: `Server` and `Data
+  Source`, `Uid` and `User Id`. `Get` matches across an alias pair, and
+  using both aliases for the same setting is a duplicate key error, just
+  like repeating the same key twice.
 
 ## Library usage
 
@@ -90,7 +94,7 @@ characters after a closing quote (`Key="a"b;`).
 ## Status
 
 Early stage. The grammar covers the common ADO.NET/ODBC shape but not
-every provider-specific convention — key aliases (`Server` vs. `Data
-Source`), the `Provider=` prefix some connection strings carry, and
-percent-encoded values in URI-style connection strings are all out of
-scope for now.
+every provider-specific convention. Only a couple of key aliases are
+recognized so far (see above); the `Provider=` prefix some connection
+strings carry, and percent-encoded values in URI-style connection
+strings, are still out of scope.

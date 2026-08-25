@@ -49,11 +49,13 @@ type ConnectionString struct {
 	Pairs []Pair
 }
 
-// Get looks up a value by key, case-insensitively, returning the first
-// match.
+// Get looks up a value by key, case-insensitively and treating known
+// aliases (such as "Server" and "Data Source") as equivalent, returning the
+// first match.
 func (cs *ConnectionString) Get(key string) (string, bool) {
+	target := canonicalKey(key)
 	for _, p := range cs.Pairs {
-		if strings.EqualFold(p.Key, key) {
+		if canonicalKey(p.Key) == target {
 			return p.Value, true
 		}
 	}
@@ -161,11 +163,11 @@ func (p *parser) run() (*ConnectionString, error) {
 			continue
 		}
 
-		lower := strings.ToLower(pair.Key)
-		if first, dup := p.seen[lower]; dup {
+		canon := canonicalKey(pair.Key)
+		if first, dup := p.seen[canon]; dup {
 			return nil, p.errorf(pair.KeyPos, "duplicate key %q (first set at %s)", pair.Key, first)
 		}
-		p.seen[lower] = pair.KeyPos
+		p.seen[canon] = pair.KeyPos
 
 		cs.Pairs = append(cs.Pairs, *pair)
 	}

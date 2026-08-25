@@ -128,6 +128,12 @@ func TestParseErrors(t *testing.T) {
 			wantPos: Position{Line: 1, Col: 7},
 		},
 		{
+			name:    "duplicate key comparison treats aliases as equal",
+			input:   "Server=a;Data Source=b",
+			wantMsg: `duplicate key "Data Source" (first set at line 1, column 1)`,
+			wantPos: Position{Line: 1, Col: 10},
+		},
+		{
 			name:    "unterminated quoted value",
 			input:   `Password="oops`,
 			wantMsg: "quoted value is never closed",
@@ -171,5 +177,29 @@ func TestGet(t *testing.T) {
 	}
 	if _, ok := cs.Get("Missing"); ok {
 		t.Error(`Get("Missing") found a value, want not found`)
+	}
+}
+
+func TestGetAliases(t *testing.T) {
+	cs, err := Parse(`Data Source=localhost;User Id=me`)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if v, ok := cs.Get("Server"); !ok || v != "localhost" {
+		t.Errorf(`Get("Server") = %q, %v, want "localhost", true`, v, ok)
+	}
+	if v, ok := cs.Get("uid"); !ok || v != "me" {
+		t.Errorf(`Get("uid") = %q, %v, want "me", true`, v, ok)
+	}
+
+	cs, err = Parse("Server=localhost;Uid=me")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if v, ok := cs.Get("Data Source"); !ok || v != "localhost" {
+		t.Errorf(`Get("Data Source") = %q, %v, want "localhost", true`, v, ok)
+	}
+	if v, ok := cs.Get("User Id"); !ok || v != "me" {
+		t.Errorf(`Get("User Id") = %q, %v, want "me", true`, v, ok)
 	}
 }
