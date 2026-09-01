@@ -167,6 +167,69 @@ func TestParseErrors(t *testing.T) {
 	}
 }
 
+func TestValidateValidInputReturnsNoErrors(t *testing.T) {
+	errs := Validate("Server=localhost;Database=app")
+	if errs != nil {
+		t.Fatalf("Validate returned %v, want nil", errs)
+	}
+}
+
+func TestValidateReportsMultipleErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantMsgs []string
+	}{
+		{
+			name:  "two malformed segments separated by a valid one",
+			input: "Foo;Server=localhost;Bar",
+			wantMsgs: []string{
+				`expected '=' after key "Foo", found ';'`,
+				`expected '=' after key "Bar", reached end of input`,
+			},
+		},
+		{
+			name:  "duplicate keys and an empty key in the same input",
+			input: "Foo=1;Foo=2;=bare;Baz=3",
+			wantMsgs: []string{
+				`duplicate key "Foo" (first set at line 1, column 1)`,
+				"empty key",
+			},
+		},
+		{
+			name:  "an unterminated quote stops recovery but is still the only error",
+			input: `Server=a;Password="oops`,
+			wantMsgs: []string{
+				"quoted value is never closed",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := Validate(tt.input)
+			if len(errs) != len(tt.wantMsgs) {
+				t.Fatalf("Validate(%q) returned %d errors, want %d: %v", tt.input, len(errs), len(tt.wantMsgs), errs)
+			}
+			for i, want := range tt.wantMsgs {
+				if !strings.Contains(errs[i].Error(), want) {
+					t.Errorf("Validate(%q) error %d = %q, want to contain %q", tt.input, i, errs[i].Error(), want)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateRecoversPastMalformedSegmentToValidPair(t *testing.T) {
+	errs := Validate("=bare;Server=localhost")
+	if len(errs) != 1 {
+		t.Fatalf("Validate returned %d errors, want 1: %v", len(errs), errs)
+	}
+	if !strings.Contains(errs[0].Error(), "empty key") {
+		t.Errorf("Validate error = %q, want to contain %q", errs[0].Error(), "empty key")
+	}
+}
+
 func TestGet(t *testing.T) {
 	cs, err := Parse("Server=localhost;Database=app")
 	if err != nil {

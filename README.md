@@ -59,16 +59,37 @@ func main() {
 just normalizes spacing and quotes values only where quoting actually
 matters.
 
+`Parse` stops at the first problem it finds. `Validate` instead keeps
+going, skipping past each malformed segment, and returns every
+`*ParseError` it found:
+
+```go
+for _, err := range connstr.Validate(input) {
+	fmt.Println(err)
+}
+```
+
+This is meant for linting a whole file or config in one pass, where
+seeing every problem at once beats fixing them one at a time. Some
+errors — an unterminated quote, most obviously — consume the rest of the
+input trying to recover, so they end the pass even in `Validate` mode;
+everything found before that point is still reported.
+
 ## Command line
 
 ```
 go run ./cmd/connstrfmt config.conf
+go run ./cmd/connstrfmt -validate config.conf
 ```
 
 Reads a connection string from the given file, or from stdin if no file
 is given, and prints the normalized form to stdout. On a parse error it
 prints the error, with the source line and a caret under the exact
 column, to stderr and exits with status 1.
+
+With `-validate`, it reports every error in the input instead of
+stopping at the first one, printing `ok` and exiting 0 if there are
+none.
 
 ## Errors
 

@@ -66,6 +66,12 @@ type parser struct {
 	sc    *scanner
 	lines []string
 	seen  map[string]Position
+
+	// collectErrors puts the parser in Validate mode: instead of stopping at
+	// the first error, it records the error and resynchronizes at the next
+	// pair boundary so it can keep looking for more problems.
+	collectErrors bool
+	errs          []*ParseError
 }
 
 // Parse validates and parses a connection string, returning a *ParseError on
@@ -77,6 +83,21 @@ func Parse(input string) (*ConnectionString, error) {
 		seen:  make(map[string]Position),
 	}
 	return p.run()
+}
+
+// Validate checks a connection string the same way Parse does, but keeps
+// going after a recoverable error instead of stopping at the first one, so
+// it can report every problem in the input in a single pass. It returns nil
+// if the input is valid.
+func Validate(input string) []*ParseError {
+	p := &parser{
+		sc:            newScanner(input),
+		lines:         splitLines(input),
+		seen:          make(map[string]Position),
+		collectErrors: true,
+	}
+	p.run()
+	return p.errs
 }
 
 func splitLines(input string) []string {
@@ -156,7 +177,10 @@ func (p *parser) run() (*ConnectionString, error) {
 
 		pair, err := p.parsePair()
 		if err != nil {
-			return nil, err
+			if p.recordParseError(err) {
+				return nil, err
+			}
+			continue
 		}
 		if pair == nil {
 			// a stray ';' with nothing before it: an empty segment, skipped.
@@ -165,7 +189,11 @@ func (p *parser) run() (*ConnectionString, error) {
 
 		canon := canonicalKey(pair.Key)
 		if first, dup := p.seen[canon]; dup {
-			return nil, p.errorf(pair.KeyPos, "duplicate key %q (first set at %s)", pair.Key, first)
+			dupErr := p.errorf(pair.KeyPos, "duplicate key %q (first set at %s)", pair.Key, first)
+			if p.recordSemanticError(dupErr) {
+				return nil, dupErr
+			}
+			continue
 		}
 		p.seen[canon] = pair.KeyPos
 
@@ -173,6 +201,47 @@ func (p *parser) run() (*ConnectionString, error) {
 	}
 
 	return cs, nil
+}
+
+// recordParseError handles an error raised while parsing a single pair. In
+// Parse mode it reports that the caller should return the error as-is; in
+// Validate mode it records the error and skips ahead to the next pair
+// boundary so parsing can continue.
+func (p *parser) recordParseError(err *ParseError) (stop bool) {
+	if !p.collectErrors {
+		return true
+	}
+	p.errs = append(p.errs, err)
+	p.resync()
+	return false
+}
+
+// recordSemanticError handles an error found after a pair was parsed
+// successfully, such as a duplicate key. The scanner is already positioned
+// at the next pair boundary, so unlike recordParseError this does not
+// resynchronize.
+func (p *parser) recordSemanticError(err *ParseError) (stop bool) {
+	if !p.collectErrors {
+		return true
+	}
+	p.errs = append(p.errs, err)
+	return false
+}
+
+// resync skips ahead to the start of what looks like the next pair, so a
+// single malformed segment doesn't prevent Validate from reporting problems
+// in the rest of the input. It is a heuristic, not a full parse: it just
+// looks for the next ';', ignoring quoting.
+func (p *parser) resync() {
+	if p.sc.pos > 0 && p.sc.runes[p.sc.pos-1] == ';' {
+		return // already sitting at the start of the next pair
+	}
+	for {
+		r, ok := p.sc.advance()
+		if !ok || r == ';' {
+			return
+		}
+	}
 }
 
 func (p *parser) parsePair() (*Pair, error) {
