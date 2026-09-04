@@ -63,9 +63,9 @@ func (cs *ConnectionString) Get(key string) (string, bool) {
 }
 
 type parser struct {
-	sc    *scanner
-	lines []string
-	seen  map[string]Position
+	sc   *scanner
+	seen map[string]Position
+	srcErrors
 
 	// collectErrors puts the parser in Validate mode: instead of stopping at
 	// the first error, it records the error and resynchronizes at the next
@@ -78,9 +78,9 @@ type parser struct {
 // the first problem it finds.
 func Parse(input string) (*ConnectionString, error) {
 	p := &parser{
-		sc:    newScanner(input),
-		lines: splitLines(input),
-		seen:  make(map[string]Position),
+		sc:        newScanner(input),
+		seen:      make(map[string]Position),
+		srcErrors: newSrcErrors(input),
 	}
 	return p.run()
 }
@@ -92,46 +92,12 @@ func Parse(input string) (*ConnectionString, error) {
 func Validate(input string) []*ParseError {
 	p := &parser{
 		sc:            newScanner(input),
-		lines:         splitLines(input),
 		seen:          make(map[string]Position),
+		srcErrors:     newSrcErrors(input),
 		collectErrors: true,
 	}
 	p.run()
 	return p.errs
-}
-
-func splitLines(input string) []string {
-	lines := strings.Split(input, "\n")
-	for i, l := range lines {
-		lines[i] = strings.TrimSuffix(l, "\r")
-	}
-	return lines
-}
-
-func (p *parser) errorf(pos Position, format string, args ...interface{}) *ParseError {
-	return &ParseError{
-		Pos:     pos,
-		Msg:     fmt.Sprintf(format, args...),
-		snippet: p.snippet(pos),
-	}
-}
-
-// snippet renders the source line the error occurred on, with a caret under
-// the exact column.
-func (p *parser) snippet(pos Position) string {
-	idx := pos.Line - 1
-	if idx < 0 || idx >= len(p.lines) {
-		return ""
-	}
-	line := p.lines[idx]
-	col := pos.Col - 1
-	if col < 0 {
-		col = 0
-	}
-	if col > len(line) {
-		col = len(line)
-	}
-	return line + "\n" + strings.Repeat(" ", col) + "^"
 }
 
 func isInsignificantWhitespace(r rune) bool {

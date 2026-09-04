@@ -63,6 +63,29 @@ matters.
 going, skipping past each malformed segment, and returns every
 `*ParseError` it found:
 
+### URI-style connection strings
+
+Some drivers — most Postgres and MySQL clients among them — write
+connection strings as a URI instead:
+`scheme://[user[:password]@]host[:port][/database][?key=value&...]`.
+`ParseURI` parses that form into the same `Pair`/`ConnectionString`
+shape, under the keys `scheme`, `user`, `password`, `host`, `port`, and
+`database`, plus one pair per query parameter, so `Get` and `Format`
+work the same regardless of which form the input used:
+
+```go
+cs, err := connstr.ParseURI("postgres://alice:s3cret@localhost:5432/mydb?sslmode=disable")
+if err != nil {
+	log.Fatal(err)
+}
+host, _ := cs.Get("host")
+```
+
+Userinfo, the database path, and query values are percent-decoded, with
+the same line/column error reporting as `Parse`. `LooksLikeURI` checks
+for the `scheme://` prefix, for callers that need to accept either form
+and pick the right parser.
+
 ```go
 for _, err := range connstr.Validate(input) {
 	fmt.Println(err)
@@ -116,6 +139,8 @@ characters after a closing quote (`Key="a"b;`).
 
 Early stage. The grammar covers the common ADO.NET/ODBC shape but not
 every provider-specific convention. Only a couple of key aliases are
-recognized so far (see above); the `Provider=` prefix some connection
-strings carry, and percent-encoded values in URI-style connection
-strings, are still out of scope.
+recognized so far (see above), and the `Provider=` prefix some
+connection strings carry is still out of scope. URI-style connection
+strings are handled by the separate `ParseURI` function rather than
+`Parse`; there's no single entry point that detects the form and picks
+the right parser yet.
