@@ -20,14 +20,19 @@ func main() {
 
 func run() error {
 	validate := flag.Bool("validate", false, "report every error in the input instead of stopping at the first one, then exit")
+	write := flag.Bool("w", false, "write the formatted result back to the input file instead of printing to stdout")
 	flag.Parse()
 
-	input, err := readInput(flag.Arg(0))
+	path := flag.Arg(0)
+	input, err := readInput(path)
 	if err != nil {
 		return err
 	}
 
 	if *validate {
+		if *write {
+			return fmt.Errorf("-w cannot be combined with -validate")
+		}
 		return runValidate(input)
 	}
 
@@ -35,8 +40,32 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	formatted := cs.Format()
 
-	fmt.Println(cs.Format())
+	if *write {
+		return writeFile(path, formatted)
+	}
+
+	fmt.Println(formatted)
+	return nil
+}
+
+// writeFile rewrites path with formatted, preserving the file's existing
+// permission bits. path must be non-empty: -w on stdin input has nowhere to
+// write back to.
+func writeFile(path, formatted string) error {
+	if path == "" {
+		return fmt.Errorf("-w requires a file argument, reading from stdin has nowhere to write back to")
+	}
+
+	perm := os.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		perm = info.Mode().Perm()
+	}
+
+	if err := os.WriteFile(path, []byte(formatted+"\n"), perm); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
 	return nil
 }
 
