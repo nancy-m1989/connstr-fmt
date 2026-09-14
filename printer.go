@@ -7,6 +7,15 @@ import "strings"
 // left unquoted they would be ambiguous or lossy (they contain ';' or '"',
 // or have leading/trailing whitespace).
 func (cs *ConnectionString) Format() string {
+	return cs.render(func(p Pair) string {
+		return formatValue(p.Value)
+	})
+}
+
+// render is shared by Format and Mask: both print every pair as
+// "Key=Value" joined by "; ", differing only in how a pair's value is
+// turned into text.
+func (cs *ConnectionString) render(value func(Pair) string) string {
 	var b strings.Builder
 	for i, p := range cs.Pairs {
 		if i > 0 {
@@ -14,7 +23,7 @@ func (cs *ConnectionString) Format() string {
 		}
 		b.WriteString(p.Key)
 		b.WriteByte('=')
-		b.WriteString(formatValue(p.Value))
+		b.WriteString(value(p))
 	}
 	return b.String()
 }

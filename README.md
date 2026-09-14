@@ -59,6 +59,17 @@ func main() {
 just normalizes spacing and quotes values only where quoting actually
 matters.
 
+`Mask` renders the same way but replaces the value of any recognized
+credential key (`Password`, `Pwd`, `Secret`, `Client Secret`, `Access
+Token`, `Api Key`) with a fixed placeholder, so a connection string can be
+included in a log line or error message without leaking what it
+authenticates with:
+
+```go
+fmt.Println(cs.Mask())
+// Server=localhost; Database=app; Password=****
+```
+
 `Parse` stops at the first problem it finds. `Validate` instead keeps
 going, skipping past each malformed segment, and returns every
 `*ParseError` it found:
