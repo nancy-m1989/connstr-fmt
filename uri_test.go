@@ -194,6 +194,46 @@ func TestParseURIErrors(t *testing.T) {
 	}
 }
 
+func TestParseAny(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "key=value form",
+			input: "Server=localhost;Database=app",
+			want:  "Server=localhost; Database=app",
+		},
+		{
+			name:  "URI form",
+			input: "postgres://alice@localhost/mydb",
+			want:  "scheme=postgres; user=alice; host=localhost; database=mydb",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, err := ParseAny(tt.input)
+			if err != nil {
+				t.Fatalf("ParseAny(%q) returned error: %v", tt.input, err)
+			}
+			if got := cs.Format(); got != tt.want {
+				t.Errorf("ParseAny(%q).Format() = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseAnyPropagatesErrors(t *testing.T) {
+	if _, err := ParseAny("postgres://"); err == nil {
+		t.Error("ParseAny with malformed URI succeeded, want error")
+	}
+	if _, err := ParseAny("Key=\"unterminated"); err == nil {
+		t.Error("ParseAny with malformed key=value input succeeded, want error")
+	}
+}
+
 func TestParseURIThenFormat(t *testing.T) {
 	cs, err := ParseURI("postgres://alice:s3cret@localhost:5432/mydb?sslmode=disable")
 	if err != nil {

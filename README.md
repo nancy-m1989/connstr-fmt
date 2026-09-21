@@ -95,7 +95,12 @@ host, _ := cs.Get("host")
 Userinfo, the database path, and query values are percent-decoded, with
 the same line/column error reporting as `Parse`. `LooksLikeURI` checks
 for the `scheme://` prefix, for callers that need to accept either form
-and pick the right parser.
+and pick the right parser; `ParseAny` does that check itself, calling
+`ParseURI` or `Parse` as appropriate:
+
+```go
+cs, err := connstr.ParseAny(input) // either form
+```
 
 ```go
 for _, err := range connstr.Validate(input) {
@@ -117,9 +122,10 @@ go run ./cmd/connstrfmt -validate config.conf
 ```
 
 Reads a connection string from the given file, or from stdin if no file
-is given, and prints the normalized form to stdout. On a parse error it
-prints the error, with the source line and a caret under the exact
-column, to stderr and exits with status 1.
+is given, and prints the normalized form to stdout, accepting either the
+key=value or URI form. On a parse error it prints the error, with the
+source line and a caret under the exact column, to stderr and exits with
+status 1.
 
 With `-validate`, it reports every error in the input instead of
 stopping at the first one, printing `ok` and exiting 0 if there are
@@ -151,7 +157,6 @@ characters after a closing quote (`Key="a"b;`).
 Early stage. The grammar covers the common ADO.NET/ODBC shape but not
 every provider-specific convention. Only a couple of key aliases are
 recognized so far (see above), and the `Provider=` prefix some
-connection strings carry is still out of scope. URI-style connection
-strings are handled by the separate `ParseURI` function rather than
-`Parse`; there's no single entry point that detects the form and picks
-the right parser yet.
+connection strings carry is still out of scope. `-validate` only covers
+the key=value form; it doesn't yet collect multiple errors from a
+malformed URI the way `Validate` does for key=value input.

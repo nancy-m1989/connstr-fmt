@@ -36,7 +36,7 @@ func run() error {
 		return runValidate(input)
 	}
 
-	cs, err := connstr.Parse(input)
+	cs, err := connstr.ParseAny(input)
 	if err != nil {
 		return err
 	}

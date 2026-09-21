@@ -19,6 +19,17 @@ func LooksLikeURI(input string) bool {
 	return true
 }
 
+// ParseAny parses input as either form of connection string, using
+// LooksLikeURI to decide whether to call Parse or ParseURI. It's the entry
+// point for callers that accept both forms and don't want to duplicate that
+// check themselves.
+func ParseAny(input string) (*ConnectionString, error) {
+	if LooksLikeURI(input) {
+		return ParseURI(input)
+	}
+	return Parse(input)
+}
+
 // ParseURI parses a URI-style connection string:
 //
 //	scheme://[user[:password]@]host[:port][/database][?key=value&...]
