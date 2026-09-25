@@ -210,7 +210,7 @@ func (p *parser) resync() {
 	}
 }
 
-func (p *parser) parsePair() (*Pair, error) {
+func (p *parser) parsePair() (*Pair, *ParseError) {
 	keyPos := p.sc.position()
 	var keyRunes []rune
 
@@ -267,7 +267,7 @@ func (p *parser) parsePair() (*Pair, error) {
 	return &Pair{Key: key, Value: value, KeyPos: keyPos, ValPos: valPos}, nil
 }
 
-func (p *parser) parseValue() (string, Position, error) {
+func (p *parser) parseValue() (string, Position, *ParseError) {
 	p.skipInlineWhitespace()
 	valPos := p.sc.position()
 
@@ -289,7 +289,7 @@ func (p *parser) parseValue() (string, Position, error) {
 	return strings.TrimRight(string(runes), " \t\r"), valPos, nil
 }
 
-func (p *parser) parseQuotedValue(quote rune, openPos Position) (string, error) {
+func (p *parser) parseQuotedValue(quote rune, openPos Position) (string, *ParseError) {
 	p.sc.advance() // consume the opening quote
 
 	var runes []rune
